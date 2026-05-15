@@ -21,9 +21,8 @@ const upload = multer({
    GOOGLE CLOUD STORAGE
 ========================= */
 
-const storage = new Storage({
-  keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-});
+const storage = new Storage();
+
 
 const bucket = storage.bucket(process.env.BUCKET_NAME);
 
