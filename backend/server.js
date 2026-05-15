@@ -10,6 +10,9 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+const PORT = process.env.PORT || 5000;
+
+
 const upload = multer({
   storage: multer.memoryStorage(),
 });
@@ -46,6 +49,11 @@ db.connect((err) => {
     console.log("MySQL Connected 😭🔥");
   }
 });
+
+app.get("/", (req, res) => {
+res.send("Backend SmartKelurahan jalan 😭🔥");
+});
+
 
 /* =========================
    API
@@ -85,6 +93,7 @@ app.post("/pengaduan", upload.single("file"), async (req, res) => {
   }
 });
 
+
 app.get("/pengaduan", (req, res) => {
   db.query("SELECT * FROM pengaduan ORDER BY id DESC", (err, result) => {
     if (err) {
@@ -95,6 +104,6 @@ app.get("/pengaduan", (req, res) => {
   });
 });
 
-app.listen(5000, () => {
-  console.log("Server running 😭🔥");
+app.listen(PORT, () => {
+  console.log("Server running on ${PORT} 😭🔥");
 });
