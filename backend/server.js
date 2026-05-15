@@ -1,15 +1,100 @@
-const express = require('express')
-const cors = require('cors')
+const express = require("express");
+const cors = require("cors");
+const multer = require("multer");
+const mysql = require("mysql2");
+const { Storage } = require("@google-cloud/storage");
+require("dotenv").config();
 
-const app = express()
+const app = express();
 
-app.use(cors())
-app.use(express.json())
+app.use(cors());
+app.use(express.json());
 
-app.get('/', (req, res) => {
-  res.send('Backend SmartKelurahan Jalan 😭🔥')
-})
+const upload = multer({
+  storage: multer.memoryStorage(),
+});
+
+/* =========================
+   GOOGLE CLOUD STORAGE
+========================= */
+
+const storage = new Storage({
+  keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+});
+
+const bucket = storage.bucket(process.env.BUCKET_NAME);
+
+/* =========================
+   MYSQL
+========================= */
+
+const db = mysql.createConnection({
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+
+  ssl: {
+    rejectUnauthorized: false,
+  },
+});
+
+db.connect((err) => {
+  if (err) {
+    console.log(err);
+  } else {
+    console.log("MySQL Connected 😭🔥");
+  }
+});
+
+/* =========================
+   API
+========================= */
+
+app.post("/pengaduan", upload.single("file"), async (req, res) => {
+  try {
+    const file = req.file;
+
+    const blob = bucket.file(Date.now() + "-" + file.originalname);
+
+    const blobStream = blob.createWriteStream();
+
+    blobStream.on("finish", () => {
+      const fileUrl = `https://storage.googleapis.com/${process.env.BUCKET_NAME}/${blob.name}`;
+
+      const sql =
+        "INSERT INTO pengaduan (nama, deskripsi, file_url) VALUES (?, ?, ?)";
+
+      db.query(sql, [req.body.nama, req.body.deskripsi, fileUrl], (err) => {
+        if (err) {
+          console.log(err);
+          return res.status(500).send(err);
+        }
+
+        res.json({
+          message: "Pengaduan berhasil 😭🔥",
+          fileUrl,
+        });
+      });
+    });
+
+    blobStream.end(file.buffer);
+  } catch (error) {
+    console.log(error);
+    res.status(500).send(error);
+  }
+});
+
+app.get("/pengaduan", (req, res) => {
+  db.query("SELECT * FROM pengaduan ORDER BY id DESC", (err, result) => {
+    if (err) {
+      return res.status(500).send(err);
+    }
+
+    res.json(result);
+  });
+});
 
 app.listen(5000, () => {
-  console.log('Server running on port 5000')
-})
+  console.log("Server running 😭🔥");
+});

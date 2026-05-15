@@ -1,7 +1,65 @@
 import './App.css'
 import { FaCloudUploadAlt } from 'react-icons/fa'
 
+import axios from 'axios'
+import { useEffect, useState } from 'react'
+
 function App() {
+
+  const [nama, setNama] = useState('')
+  const [deskripsi, setDeskripsi] = useState('')
+  const [file, setFile] = useState(null)
+
+  const [data, setData] = useState([])
+
+  /* =========================
+     AMBIL DATA
+  ========================= */
+
+  const getData = async () => {
+
+    const res =
+      await axios.get(
+        'http://localhost:5000/pengaduan'
+      )
+
+    setData(res.data)
+
+  }
+
+  useEffect(() => {
+    getData()
+  }, [])
+
+  /* =========================
+     SUBMIT
+  ========================= */
+
+  const submitPengaduan = async (e) => {
+
+    e.preventDefault()
+
+    const formData = new FormData()
+
+    formData.append('nama', nama)
+    formData.append('deskripsi', deskripsi)
+    formData.append('file', file)
+
+    await axios.post(
+      'http://localhost:5000/pengaduan',
+      formData
+    )
+
+    alert('Berhasil Upload 😭🔥')
+
+    setNama('')
+    setDeskripsi('')
+    setFile(null)
+
+    getData()
+
+  }
+
   return (
     <div className="container">
 
@@ -24,15 +82,21 @@ function App() {
 
           <h2>Form Pengaduan Warga</h2>
 
-          <form>
+          <form onSubmit={submitPengaduan}>
 
             <input
               type="text"
               placeholder="Masukkan Nama"
+              value={nama}
+              onChange={(e) => setNama(e.target.value)}
+              required
             />
 
             <textarea
               placeholder="Tulis Pengaduan..."
+              value={deskripsi}
+              onChange={(e) => setDeskripsi(e.target.value)}
+              required
             ></textarea>
 
             <div className="upload-box">
@@ -41,7 +105,11 @@ function App() {
 
               <p>Upload Foto / Dokumen</p>
 
-              <input type="file" />
+              <input
+                type="file"
+                onChange={(e) => setFile(e.target.files[0])}
+                required
+              />
 
             </div>
 
@@ -60,20 +128,26 @@ function App() {
 
         <h2>Data Pengaduan</h2>
 
-        <div className="data-card">
+        {
+          data.map((item) => (
 
-          <h3>Jalan Rusak</h3>
+            <div className="data-card" key={item.id}>
 
-          <p>
-            Jalan di depan kantor kelurahan rusak dan berlubang.
-          </p>
+              <h3>{item.nama}</h3>
 
-          <img
-            src="https://images.unsplash.com/photo-1506744038136-46273834b3fb"
-            alt=""
-          />
+              <p>
+                {item.deskripsi}
+              </p>
 
-        </div>
+              <img
+                src={item.file_url}
+                alt=""
+              />
+
+            </div>
+
+          ))
+        }
 
       </section>
 
