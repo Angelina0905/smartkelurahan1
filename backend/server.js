@@ -5,24 +5,30 @@ const mysql = require("mysql2");
 const { Storage } = require("@google-cloud/storage");
 require("dotenv").config();
 
+const app = express(); // ✅ HARUS DI ATAS
+
+/* =========================
+   MIDDLEWARE
+========================= */
 app.use((req, res, next) => {
   console.log("🔥 REQUEST MASUK:", req.method, req.url);
   next();
 });
 
-const app = express();
-app.use(
-  cors({
-    origin: "*",
-    methods: ["GET", "POST", "PUT", "DELETE"],
-  }),
-);
+app.use(cors({
+  origin: "*",
+  methods: ["GET", "POST", "PUT", "DELETE"]
+}));
+
 app.use(express.json());
 
+/* =========================
+   PORT
+========================= */
 const PORT = process.env.PORT || 8080;
 
 /* =========================
-   HEALTH CHECK (WAJIB CLOUD RUN)
+   HEALTH CHECK
 ========================= */
 app.get("/", (req, res) => {
   res.send("Backend SmartKelurahan LIVE 🚀");
@@ -35,52 +41,30 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 }
 });
+
 /* =========================
-   GOOGLE CLOUD STORAGE
+   GCS
 ========================= */
-let bucket;
-try {
-  const storage = new Storage();
-
-  if (process.env.BUCKET_NAME) {
-    bucket = storage.bucket(process.env.BUCKET_NAME);
-  } else {
-    console.warn("BUCKET_NAME belum diset");
-  }
-} catch (err) {
-  console.error("GCS error:", err);
-}
+const storage = new Storage();
+const bucket = storage.bucket(process.env.BUCKET_NAME);
 
 /* =========================
-   MYSQL (SAFE CONNECTION)
+   MYSQL
 ========================= */
-let db;
+const db = mysql.createConnection({
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+  socketPath: `/cloudsql/${process.env.INSTANCE_CONNECTION_NAME}`,
+});
 
-function connectDB() {
-  try {
-    db = mysql.createConnection({
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME,
-      socketPath: `/cloudsql/${process.env.INSTANCE_CONNECTION_NAME}`,
-    });
-
-    db.connect((err) => {
-      if (err) {
-        console.error("MySQL Error:", err);
-        return;
-      }
-      console.log("MySQL Connected 🚀");
-    });
-  } catch (err) {
-    console.error("DB init error:", err);
-  }
-}
-
-connectDB();
+db.connect((err) => {
+  if (err) console.log("MySQL ERROR:", err);
+  else console.log("MySQL CONNECTED 🚀");
+});
 
 /* =========================
-   API
+   POST UPLOAD
 ========================= */
 app.post("/pengaduan", upload.single("file"), async (req, res) => {
   try {
@@ -93,74 +77,56 @@ app.post("/pengaduan", upload.single("file"), async (req, res) => {
     }
 
     const fileName = `${Date.now()}-${req.file.originalname}`;
-    const blob = bucket.file(fileName);
+    const file = bucket.file(fileName);
 
-    // =========================
-    // UPLOAD KE GCS (PROMISE)
-    // =========================
     await new Promise((resolve, reject) => {
-      const stream = blob.createWriteStream({
+      const stream = file.createWriteStream({
         resumable: false,
         contentType: req.file.mimetype,
       });
 
-      stream.on("error", (err) => {
-        console.log("GCS ERROR:", err);
-        reject(err);
-      });
-
-      stream.on("finish", () => {
-        resolve();
-      });
+      stream.on("error", reject);
+      stream.on("finish", resolve);
 
       stream.end(req.file.buffer);
     });
 
     const fileUrl = `https://storage.googleapis.com/${process.env.BUCKET_NAME}/${fileName}`;
 
-    // =========================
-    // SIMPAN KE MYSQL (PROMISE)
-    // =========================
     await new Promise((resolve, reject) => {
       db.query(
         "INSERT INTO pengaduan (nama, deskripsi, file_url) VALUES (?, ?, ?)",
         [req.body.nama, req.body.deskripsi, fileUrl],
-        (err, result) => {
-          if (err) {
-            console.log("DB ERROR:", err);
-            reject(err);
-          } else {
-            resolve(result);
-          }
+        (err) => {
+          if (err) return reject(err);
+          resolve();
         }
       );
     });
 
     return res.json({
-      message: "Upload sukses 🚀",
+      message: "UPLOAD SUCCESS 🚀",
       fileUrl
     });
 
   } catch (err) {
-    console.log("❌ SERVER ERROR FULL:", err);
-    return res.status(500).json({
-      error: err.message
-    });
+    console.log("ERROR:", err);
+    return res.status(500).json({ error: err.message });
   }
 });
 
+/* =========================
+   GET DATA
+========================= */
 app.get("/pengaduan", (req, res) => {
   db.query("SELECT * FROM pengaduan ORDER BY id DESC", (err, result) => {
-    if (err) {
-      return res.status(500).json({ error: err });
-    }
-
+    if (err) return res.status(500).json(err);
     res.json(result);
   });
 });
 
 /* =========================
-   START SERVER (IMPORTANT)
+   START
 ========================= */
 app.listen(PORT, "0.0.0.0", () => {
   console.log("Server running on", PORT);
