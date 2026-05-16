@@ -6,7 +6,12 @@ const { Storage } = require("@google-cloud/storage");
 require("dotenv").config();
 
 const app = express();
-app.use(cors());
+app.use(
+  cors({
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "DELETE"],
+  }),
+);
 app.use(express.json());
 
 const PORT = process.env.PORT || 8080;
@@ -23,8 +28,8 @@ app.get("/", (req, res) => {
 ========================= */
 const upload = multer({
   storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }
 });
-
 /* =========================
    GOOGLE CLOUD STORAGE
 ========================= */
@@ -72,38 +77,46 @@ connectDB();
 /* =========================
    API
 ========================= */
-app.post("/pengaduan", upload.single("file"), (req, res) => {
+app.post("/pengaduan", upload.single("file"), async (req, res) => {
   try {
+
     if (!req.file) {
-      return res.status(400).json({ error: "File tidak ada" });
+      return res.status(400).json({ error: "File tidak masuk" });
     }
 
     const blob = bucket.file(Date.now() + "-" + req.file.originalname);
-    const blobStream = blob.createWriteStream();
 
-    blobStream.on("finish", () => {
-      const fileUrl = `https://storage.googleapis.com/${process.env.BUCKET_NAME}/${blob.name}`;
+    const stream = blob.createWriteStream();
 
-      const sql =
-        "INSERT INTO pengaduan (nama, deskripsi, file_url) VALUES (?, ?, ?)";
-
-      db.query(sql, [req.body.nama, req.body.deskripsi, fileUrl], (err) => {
-        if (err) {
-          console.error(err);
-          return res.status(500).json({ error: err });
-        }
-
-        res.json({
-          message: "Pengaduan berhasil dibuat",
-          fileUrl,
-        });
-      });
+    stream.on("error", (err) => {
+      console.log("GCS ERROR:", err);
+      return res.status(500).json(err);
     });
 
-    blobStream.end(req.file.buffer);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error });
+    stream.on("finish", () => {
+
+      const fileUrl = `https://storage.googleapis.com/${process.env.BUCKET_NAME}/${blob.name}`;
+
+      db.query(
+        "INSERT INTO pengaduan (nama, deskripsi, file_url) VALUES (?, ?, ?)",
+        [req.body.nama, req.body.deskripsi, fileUrl],
+        (err) => {
+          if (err) {
+            console.log("DB ERROR:", err);
+            return res.status(500).json(err);
+          }
+
+          res.json({ message: "Upload sukses", fileUrl });
+        }
+      );
+
+    });
+
+    stream.end(req.file.buffer);
+
+  } catch (err) {
+    console.log("SERVER ERROR:", err);
+    res.status(500).json(err);
   }
 });
 

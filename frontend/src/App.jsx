@@ -45,6 +45,7 @@ function App() {
       getData();
 
     } catch (err) {
+      console.log("UPLOAD ERROR FULL:", err.response?.data || err.message);
       alert("Gagal upload");
       console.log(err);
     }
