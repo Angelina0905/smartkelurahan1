@@ -10,7 +10,8 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const PORT = 8080;
+const PORT = process.env.PORT || 8080;
+
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -34,23 +35,23 @@ if (!connectionName) {
   console.error("DB_HOST belum diset 😭🔥");
 }
 
-const mysql = require("mysql2");
+// const mysql = require("mysql2");
 
-const db = mysql.createConnection({
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
-  socketPath: `/cloudsql/${process.env.INSTANCE_CONNECTION_NAME}`,
-});
+// const db = mysql.createConnection({
+//   user: process.env.DB_USER,
+//   password: process.env.DB_PASSWORD,
+//   database: process.env.DB_NAME,
+//   socketPath: `/cloudsql/${process.env.INSTANCE_CONNECTION_NAME}`,
+// });
 
-db.connect((err) => {
-  if (err) {
-    console.log("MySQL Error 😭🔥");
-    console.log(err);
-  } else {
-    console.log("MySQL Connected 😭🔥");
-  }
-});
+// db.connect((err) => {
+//   if (err) {
+//     console.log("MySQL Error 😭🔥");
+//     console.log(err);
+//   } else {
+//     console.log("MySQL Connected 😭🔥");
+//   }
+// });
 
 app.get("/", (req, res) => {
   res.send("Backend SmartKelurahan jalan 😭🔥");
@@ -104,6 +105,6 @@ app.get("/pengaduan", (req, res) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on ${PORT} 😭🔥`);
-});  
+app.listen(PORT, "0.0.0.0", () => {
+  console.log("Running on", PORT);
+}); 
