@@ -28,11 +28,19 @@ const bucket = storage.bucket(process.env.BUCKET_NAME);
    MYSQL
 ========================= */
 
+const connectionName = process.env.DB_HOST;
+
+if (!connectionName) {
+  console.error("DB_HOST belum diset 😭🔥");
+}
+
+const mysql = require("mysql2");
+
 const db = mysql.createConnection({
-  host: process.env.DB_HOST,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
+  socketPath: `/cloudsql/${process.env.INSTANCE_CONNECTION_NAME}`,
 });
 
 db.connect((err) => {
@@ -98,4 +106,4 @@ app.get("/pengaduan", (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Server running on ${PORT} 😭🔥`);
-});
+});  
