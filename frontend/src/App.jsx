@@ -10,13 +10,21 @@ function App() {
   const [deskripsi, setDeskripsi] = useState('')
   const [file, setFile] = useState(null)
   const [data, setData] = useState([])
+  const [loading, setLoading] = useState(false)
 
+  // =========================
+  // GET DATA
+  // =========================
   const getData = async () => {
     try {
       const res = await axios.get(`${API_URL}/pengaduan`);
+
+      console.log("GET DATA:", res.data);
+
       setData(Array.isArray(res.data) ? res.data : []);
+
     } catch (err) {
-      console.log(err);
+      console.log("GET ERROR:", err.response?.data || err.message);
       setData([]);
     }
   }
@@ -25,16 +33,37 @@ function App() {
     getData();
   }, []);
 
+  // =========================
+  // SUBMIT UPLOAD
+  // =========================
   const submitPengaduan = async (e) => {
     e.preventDefault();
 
     try {
+
+      if (!file) {
+        alert("Pilih file dulu");
+        return;
+      }
+
+      setLoading(true);
+
       const formData = new FormData();
       formData.append('nama', nama);
       formData.append('deskripsi', deskripsi);
       formData.append('file', file);
 
-      await axios.post(`${API_URL}/pengaduan`, formData);
+      const res = await axios.post(
+        `${API_URL}/pengaduan`,
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data"
+          }
+        }
+      );
+
+      console.log("UPLOAD SUCCESS:", res.data);
 
       alert("Berhasil dikirim 🚀");
 
@@ -45,9 +74,13 @@ function App() {
       getData();
 
     } catch (err) {
-      console.log("UPLOAD ERROR FULL:", err.response?.data || err.message);
-      alert("Gagal upload");
+      console.log("❌ UPLOAD ERROR FULL:");
+      console.log(err.response?.data || err.message);
       console.log(err);
+
+      alert("Gagal upload 😭 cek console");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -89,8 +122,8 @@ function App() {
               required
             />
 
-            <button type="submit">
-              Kirim Pengaduan
+            <button type="submit" disabled={loading}>
+              {loading ? "Uploading..." : "Kirim Pengaduan"}
             </button>
 
           </form>
@@ -99,13 +132,19 @@ function App() {
         {/* DATA */}
         <div className="grid">
 
-          {data.map((item, i) => (
-            <div className="card item" key={i}>
-              <h3>{item.nama}</h3>
-              <p>{item.deskripsi}</p>
-              <img src={item.file_url} alt="" />
-            </div>
-          ))}
+          {data.length === 0 ? (
+            <p>Belum ada data</p>
+          ) : (
+            data.map((item, i) => (
+              <div className="card item" key={i}>
+                <h3>{item.nama}</h3>
+                <p>{item.deskripsi}</p>
+                {item.file_url && (
+                  <img src={item.file_url} alt="" />
+                )}
+              </div>
+            ))
+          )}
 
         </div>
 
