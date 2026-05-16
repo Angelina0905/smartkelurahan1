@@ -6,13 +6,21 @@ const { Storage } = require("@google-cloud/storage");
 require("dotenv").config();
 
 const app = express();
-
 app.use(cors());
 app.use(express.json());
 
 const PORT = process.env.PORT || 8080;
 
+/* =========================
+   HEALTH CHECK (WAJIB CLOUD RUN)
+========================= */
+app.get("/", (req, res) => {
+  res.send("Backend SmartKelurahan LIVE 🚀");
+});
 
+/* =========================
+   MULTER
+========================= */
 const upload = multer({
   storage: multer.memoryStorage(),
 });
@@ -20,53 +28,57 @@ const upload = multer({
 /* =========================
    GOOGLE CLOUD STORAGE
 ========================= */
+let bucket;
+try {
+  const storage = new Storage();
 
-const storage = new Storage();
-
-const bucket = storage.bucket(process.env.BUCKET_NAME);
-
-/* =========================
-   MYSQL
-========================= */
-
-const connectionName = process.env.DB_HOST;
-
-if (!connectionName) {
-  console.error("DB_HOST belum diset 😭🔥");
+  if (process.env.BUCKET_NAME) {
+    bucket = storage.bucket(process.env.BUCKET_NAME);
+  } else {
+    console.warn("BUCKET_NAME belum diset");
+  }
+} catch (err) {
+  console.error("GCS error:", err);
 }
 
-// const mysql = require("mysql2");
+/* =========================
+   MYSQL (SAFE CONNECTION)
+========================= */
+let db;
 
-// const db = mysql.createConnection({
-//   user: process.env.DB_USER,
-//   password: process.env.DB_PASSWORD,
-//   database: process.env.DB_NAME,
-//   socketPath: `/cloudsql/${process.env.INSTANCE_CONNECTION_NAME}`,
-// });
+function connectDB() {
+  try {
+    db = mysql.createConnection({
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWORD,
+      database: process.env.DB_NAME,
+      socketPath: `/cloudsql/${process.env.INSTANCE_CONNECTION_NAME}`,
+    });
 
-// db.connect((err) => {
-//   if (err) {
-//     console.log("MySQL Error 😭🔥");
-//     console.log(err);
-//   } else {
-//     console.log("MySQL Connected 😭🔥");
-//   }
-// });
+    db.connect((err) => {
+      if (err) {
+        console.error("MySQL Error:", err);
+        return;
+      }
+      console.log("MySQL Connected 🚀");
+    });
+  } catch (err) {
+    console.error("DB init error:", err);
+  }
+}
 
-app.get("/", (req, res) => {
-  res.send("Backend SmartKelurahan jalan 😭🔥");
-});
+connectDB();
 
 /* =========================
    API
 ========================= */
-
-app.post("/pengaduan", upload.single("file"), async (req, res) => {
+app.post("/pengaduan", upload.single("file"), (req, res) => {
   try {
-    const file = req.file;
+    if (!req.file) {
+      return res.status(400).json({ error: "File tidak ada" });
+    }
 
-    const blob = bucket.file(Date.now() + "-" + file.originalname);
-
+    const blob = bucket.file(Date.now() + "-" + req.file.originalname);
     const blobStream = blob.createWriteStream();
 
     blobStream.on("finish", () => {
@@ -77,8 +89,8 @@ app.post("/pengaduan", upload.single("file"), async (req, res) => {
 
       db.query(sql, [req.body.nama, req.body.deskripsi, fileUrl], (err) => {
         if (err) {
-          console.log(err);
-          return res.status(500).send(err);
+          console.error(err);
+          return res.status(500).json({ error: err });
         }
 
         res.json({
@@ -88,23 +100,26 @@ app.post("/pengaduan", upload.single("file"), async (req, res) => {
       });
     });
 
-    blobStream.end(file.buffer);
+    blobStream.end(req.file.buffer);
   } catch (error) {
-    console.log(error);
-    res.status(500).send(error);
+    console.error(error);
+    res.status(500).json({ error });
   }
 });
 
 app.get("/pengaduan", (req, res) => {
   db.query("SELECT * FROM pengaduan ORDER BY id DESC", (err, result) => {
     if (err) {
-      return res.status(500).send(err);
+      return res.status(500).json({ error: err });
     }
 
     res.json(result);
   });
 });
 
+/* =========================
+   START SERVER (IMPORTANT)
+========================= */
 app.listen(PORT, "0.0.0.0", () => {
-  console.log("Running on", PORT);
-}); 
+  console.log("Server running on", PORT);
+});
