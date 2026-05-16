@@ -1,155 +1,114 @@
 import './App.css'
-import { FaCloudUploadAlt } from 'react-icons/fa'
-
-import axios from 'axios'
 import { useEffect, useState } from 'react'
+import axios from 'axios'
+
+const API_URL = import.meta.env.VITE_API_URL;
 
 function App() {
 
   const [nama, setNama] = useState('')
   const [deskripsi, setDeskripsi] = useState('')
   const [file, setFile] = useState(null)
-
   const [data, setData] = useState([])
 
-  /* =========================
-     AMBIL DATA
-  ========================= */
-
   const getData = async () => {
-
-    const res =
-      await axios.get(
-        'http://localhost:5000/pengaduan'
-      )
-
-    setData(res.data)
-
+    try {
+      const res = await axios.get(`${API_URL}/pengaduan`);
+      setData(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      console.log(err);
+      setData([]);
+    }
   }
 
   useEffect(() => {
-    getData()
-  }, [])
-
-  /* =========================
-     SUBMIT
-  ========================= */
+    getData();
+  }, []);
 
   const submitPengaduan = async (e) => {
+    e.preventDefault();
 
-    e.preventDefault()
+    try {
+      const formData = new FormData();
+      formData.append('nama', nama);
+      formData.append('deskripsi', deskripsi);
+      formData.append('file', file);
 
-    const formData = new FormData()
+      await axios.post(`${API_URL}/pengaduan`, formData);
 
-    formData.append('nama', nama)
-    formData.append('deskripsi', deskripsi)
-    formData.append('file', file)
+      alert("Berhasil dikirim 🚀");
 
-    await axios.post(
-      'http://localhost:5000/pengaduan',
-      formData
-    )
+      setNama('');
+      setDeskripsi('');
+      setFile(null);
 
-    alert('Berhasil Upload 😭🔥')
+      getData();
 
-    setNama('')
-    setDeskripsi('')
-    setFile(null)
-
-    getData()
-
+    } catch (err) {
+      alert("Gagal upload");
+      console.log(err);
+    }
   }
 
   return (
-    <div className="container">
+    <div className="app">
 
-      {/* HERO */}
-      <section className="hero">
+      <div className="container">
 
-        <h1>SmartKelurahan</h1>
+        {/* HEADER */}
+        <div className="header">
+          <h1>SmartKelurahan</h1>
+          <p>Sistem Pengaduan Warga Berbasis Cloud</p>
+        </div>
 
-        <p>
-          Platform digital pelayanan masyarakat modern untuk pengaduan warga
-          dan administrasi online berbasis cloud computing.
-        </p>
-
-      </section>
-
-      {/* FORM */}
-      <section className="form-section">
-
-        <div className="form-card">
-
-          <h2>Form Pengaduan Warga</h2>
+        {/* FORM */}
+        <div className="card">
+          <h2>Form Pengaduan</h2>
 
           <form onSubmit={submitPengaduan}>
 
             <input
               type="text"
-              placeholder="Masukkan Nama"
+              placeholder="Nama"
               value={nama}
               onChange={(e) => setNama(e.target.value)}
               required
             />
 
             <textarea
-              placeholder="Tulis Pengaduan..."
+              placeholder="Deskripsi pengaduan..."
               value={deskripsi}
               onChange={(e) => setDeskripsi(e.target.value)}
               required
-            ></textarea>
+            />
 
-            <div className="upload-box">
-
-              <FaCloudUploadAlt size={40} />
-
-              <p>Upload Foto / Dokumen</p>
-
-              <input
-                type="file"
-                onChange={(e) => setFile(e.target.files[0])}
-                required
-              />
-
-            </div>
+            <input
+              type="file"
+              onChange={(e) => setFile(e.target.files[0])}
+              required
+            />
 
             <button type="submit">
               Kirim Pengaduan
             </button>
 
           </form>
+        </div>
+
+        {/* DATA */}
+        <div className="grid">
+
+          {data.map((item, i) => (
+            <div className="card item" key={i}>
+              <h3>{item.nama}</h3>
+              <p>{item.deskripsi}</p>
+              <img src={item.file_url} alt="" />
+            </div>
+          ))}
 
         </div>
 
-      </section>
-
-      {/* DATA */}
-      <section className="data-section">
-
-        <h2>Data Pengaduan</h2>
-
-        {
-          data.map((item) => (
-
-            <div className="data-card" key={item.id}>
-
-              <h3>{item.nama}</h3>
-
-              <p>
-                {item.deskripsi}
-              </p>
-
-              <img
-                src={item.file_url}
-                alt=""
-              />
-
-            </div>
-
-          ))
-        }
-
-      </section>
+      </div>
 
     </div>
   )
