@@ -76,7 +76,7 @@ app.post("/pengaduan", upload.single("file"), async (req, res) => {
         }
 
         res.json({
-          message: "Pengaduan berhasil 😭🔥",
+          message: "Pengaduan berhasil dibuat",
           fileUrl,
         });
       });
