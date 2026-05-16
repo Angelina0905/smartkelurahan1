@@ -80,43 +80,67 @@ connectDB();
 app.post("/pengaduan", upload.single("file"), async (req, res) => {
   try {
 
+    console.log("BODY:", req.body);
+    console.log("FILE:", req.file);
+
     if (!req.file) {
       return res.status(400).json({ error: "File tidak masuk" });
     }
 
-    const blob = bucket.file(Date.now() + "-" + req.file.originalname);
+    const fileName = `${Date.now()}-${req.file.originalname}`;
+    const blob = bucket.file(fileName);
 
-    const stream = blob.createWriteStream();
+    // =========================
+    // UPLOAD KE GCS (PROMISE)
+    // =========================
+    await new Promise((resolve, reject) => {
+      const stream = blob.createWriteStream({
+        resumable: false,
+        contentType: req.file.mimetype,
+      });
 
-    stream.on("error", (err) => {
-      console.log("GCS ERROR:", err);
-      return res.status(500).json(err);
+      stream.on("error", (err) => {
+        console.log("GCS ERROR:", err);
+        reject(err);
+      });
+
+      stream.on("finish", () => {
+        resolve();
+      });
+
+      stream.end(req.file.buffer);
     });
 
-    stream.on("finish", () => {
+    const fileUrl = `https://storage.googleapis.com/${process.env.BUCKET_NAME}/${fileName}`;
 
-      const fileUrl = `https://storage.googleapis.com/${process.env.BUCKET_NAME}/${blob.name}`;
-
+    // =========================
+    // SIMPAN KE MYSQL (PROMISE)
+    // =========================
+    await new Promise((resolve, reject) => {
       db.query(
         "INSERT INTO pengaduan (nama, deskripsi, file_url) VALUES (?, ?, ?)",
         [req.body.nama, req.body.deskripsi, fileUrl],
-        (err) => {
+        (err, result) => {
           if (err) {
             console.log("DB ERROR:", err);
-            return res.status(500).json(err);
+            reject(err);
+          } else {
+            resolve(result);
           }
-
-          res.json({ message: "Upload sukses", fileUrl });
         }
       );
-
     });
 
-    stream.end(req.file.buffer);
+    return res.json({
+      message: "Upload sukses 🚀",
+      fileUrl
+    });
 
   } catch (err) {
-    console.log("SERVER ERROR:", err);
-    res.status(500).json(err);
+    console.log("❌ SERVER ERROR FULL:", err);
+    return res.status(500).json({
+      error: err.message
+    });
   }
 });
 
